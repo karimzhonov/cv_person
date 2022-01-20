@@ -6,7 +6,7 @@ python manage.py
 ```
 > Example using CustomDetector:
 ```python
-from main.models import CustomDetector, FaceDetector, HandDetector
+from cv_person import CustomDetector, FaceDetector, HandDetector
 
 # create object detector
 detector = CustomDetector(detectors=[
