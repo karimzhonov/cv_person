@@ -1,22 +1,13 @@
 import cv2
 import time
 from config import COLOR
+from main.views import view
 
 
 def draw_circles(img, coordinates: list):
-    for (cx, cy) in coordinates:
+    for cx, cy in coordinates:
         img = cv2.circle(img, (cx, cy), 2, COLOR, cv2.FILLED)
     return img
-
-
-def get_cap_name(params):
-    try:
-        cap_name = int(params['cap_name'])
-    except IndexError:
-        raise 'Enter Capture'
-    except ValueError:
-        cap_name = params['cap_name']
-    return cap_name
 
 
 def imshow(frame):
@@ -30,38 +21,26 @@ def imshow(frame):
         return False
 
 
-def max_arg(array: list):
-    m = array[0]
-    k = 0
-    for i, point in enumerate(array):
-        if m < point:
-            m = point
-            k = i
-    return k
-
-
-def cmd_handler(keys: tuple, render, params: dict = {}):
-    return keys, render, params
-
-
 def start_cmd_handlers(_flags):
-    from main.controllers import keys_handlers
-    response = []
-    for keys, render, params in keys_handlers:
-        counter = 0
-        for key in keys:
-            if key in _flags:
-                counter += 1
-        response.append(counter)
-    res = max_arg(response)
-    keys, render, params = keys_handlers[res]
+    from main.controllers import key_handlers
+    layers = []
+    for key in _flags[1:]:
+        for flag, layer in key_handlers:
+            if key == flag:
+                layers.append(layer())
+
+    params = {
+        '_flags': _flags
+    }
     try:
-        params['cap_name'] = _flags[0]
-        params['keys'] = keys
-        params['flags'] = _flags
+        params['cap_name'] = int(_flags[0])
+        view(layers, params=params)
     except IndexError:
-        pass
-    render(params)
+        from main.views import cmd_help
+        cmd_help()
+    except ValueError:
+        params['cap_name'] = _flags[0]
+        view(layers, params=params)
 
 
 def run(sys_args: list):
@@ -90,37 +69,39 @@ class Detector:
     def get_landmarks(self, img_rgb):
         pass
 
-    def get_coordinate(self, img, _id=None):
+    def insert_coordinate_from_point(self, point, img_shape, _id_list=None):
+        h, w, c = img_shape
+        if not _id_list:
+            fingers_ids = self.id_list
+        else:
+            fingers_ids = [self.id_list[_id] for _id in _id_list ]
+        res = []
+        for idd in fingers_ids:
+            finger = point.landmark[idd]
+            cx, cy = int(finger.x * w), int(finger.y * h)
+            res.append((cx, cy))
+        return res
+
+    def get_coordinate(self, img, _id_list=None):
         """
         Get Coordinate
         :param img: Image
-        :param _id: None or int
+        :param _id_list: list of id
         :return: List coordinates and Image
         """
         coordinates = []
         try:
             img_rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
         except cv2.error:
-            return [], img
+            return coordinates
         else:
-            if not _id:
-                fingers_ids = self.id_list
-            else:
-                fingers_ids = [self.id_list[_id]]
-
             landmarks = self.get_landmarks(img_rgb)
             if landmarks:
                 for point in landmarks:
-                    for idd in fingers_ids:
-                        if point:
-                            finger = point.landmark[idd]
-                            h, w, c = img_rgb.shape
-                            cx, cy = int(finger.x * w), int(finger.y * h)
-                            coordinates.append((cx, cy))
-                            # img = cv2.putText(img, str(idd), (cx, cy), cv2.FONT_HERSHEY_PLAIN, 0.6, COLOR, 1)
-                    # if self.draw:
-                    #     draw_landmarks(img, point, self.draw_connection)
-            return coordinates, img
+                    if point:
+                        res = self.insert_coordinate_from_point(point, img_rgb.shape, _id_list=_id_list)
+                        coordinates += res
+            return coordinates
 
     def streem(self):
         cap = cv2.VideoCapture(self.cap_name)
@@ -128,7 +109,7 @@ class Detector:
         print('For quit press "q"')
         while imshow(img):
             _, img = cap.read()
-            coordinates, img = self.get_coordinate(img)
+            coordinates = self.get_coordinate(img)
             if self.draw:
                 img = draw_circles(img, coordinates)
             img = self.set_fps(img)

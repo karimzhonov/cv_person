@@ -2,7 +2,7 @@
 
 > More information:
 ```
-python manage.py --help
+python manage.py
 ```
 > Example using CustomDetector:
 ```python
@@ -21,7 +21,7 @@ detector.streem()
 ```
 > For test, run command:
 ```
-python manage.py ./data/2.mp4 --person
+python manage.py ./data/2.mp4 --face-mesh --hand
 ```
 ![This is an image](./data/face.jpeg)
 ![This is an image](./data/hand.png)
